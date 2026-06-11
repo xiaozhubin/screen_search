@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screenpipe 全能检索与调试控制台</title>
+    <style>
+        /* ================= 核心 CSS 变量 ================= */
+        :root {
+            --bg-color: #020617;         /* 深邃板岩黑 */
+            --bg-card: rgba(15, 23, 42, 0.45); /* 卡片半透明黑 */
+            --bg-input: #090d1a;
+            --border-color: #1e293b;     /* 板岩灰边框 */
+            --border-hover: #334155;
+            --text-main: #f8fafc;        /* 主白 */
+            --text-muted: #94a3b8;       /* 辅助灰 */
+            --text-dark: #64748b;
+            --primary: #6366f1;          /* 科技靛蓝 */
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.15);
+            --success: #10b981;          /* 成功翡翠绿 */
+            --success-border: rgba(16, 185, 129, 0.2);
+            --success-bg: rgba(6, 78, 59, 0.3);
+            --error: #ef4444;            /* 警示红 */
+            --error-border: rgba(239, 68, 68, 0.2);
+            --error-bg: rgba(76, 5, 25, 0.3);
+            --warning: #f59e0b;          /* 温暖橘黄 */
+            --warning-border: rgba(245, 158, 11, 0.2);
+            --warning-bg: rgba(120, 53, 4, 0.2);
+            --font-sans: 'Noto Sans', 'Noto Sans SC', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        /* ================= 全局基础排版 ================= */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        html, body {
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b1329;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+
+        /* SVG 图标通用基类 */
+        .svg-icon {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .icon-lg { width: 24px; height: 24px; }
+        .icon-sm { width: 14px; height: 14px; }
+
+        /* ================= 布局容器 ================= */
+        header.site-header {
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            padding: 16px 24px;
+        }
+        .header-content {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .brand-icon {
+            padding: 8px;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 12px;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            color: #818cf8;
+            display: flex;
+            align-items: center;
+        }
+        .brand-title h1 {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            background: linear-gradient(to right, #ffffff, #cbd5e1, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .brand-title p {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* 本地连接输入面板 */
+        .conn-manager {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+        .input-group-host {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            width: 320px;
+        }
+        .host-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            padding: 0 8px;
+            user-select: none;
+        }
+        .host-input {
+            background: transparent;
+            border: none;
+            color: #a5b4fc;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            outline: none;
+            flex: 1;
+            padding: 4px 0;
+        }
+        .btn {
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 13px;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border: none;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #ffffff;
+            padding: 6px 12px;
+        }
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        /* 连接状态状态灯 */
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-family: var(--font-mono);
+            font-weight: 500;
+        }
+        .status-disconnected {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+        .status-connected {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot-disconnected { background: #ef4444; }
+        .dot-connected { background: #10b981; }
+
+        /* 主体布局 */
+        .app-layout {
+            max-width: 1280px;
+            width: 100%;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            gap: 24px;
+            padding: 24px;
+            flex: 1;
+            overflow: hidden;
+        }
+        @media (max-width: 1024px) {
+            .app-layout {
+                grid-template-columns: 1fr;
+                overflow-y: auto;
+            }
+        }
+
+        /* 左侧菜单 */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .tab-navigation {
+            background: rgba(15, 23, 42, 0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        @media (max-width: 1024px) {
+            .tab-navigation {
+                flex-direction: row;
+                overflow-x: auto;
+            }
+        }
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            text-align: left;
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .nav-btn:hover {
+            background: rgba(15, 23, 42, 0.5);
+            color: var(--text-main);
+        }
+        .nav-btn.active {
+            background: rgba(99, 102, 241, 0.1);
+            color: #818cf8;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+        .nav-btn.text-amber {
+            color: #fbbf24;
+        }
+
+        /* 快捷微卡 */
+        .widget-panel {
+            background: rgba(15, 23, 42, 0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .widget-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .widget-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .widget-btn {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: #cbd5e1;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        .widget-btn:hover {
+            background: rgba(30, 41, 59, 0.6);
+            border-color: var(--border-hover);
+        }
+        .widget-btn svg {
+            color: var(--text-dark);
+        }
+
+        /* 右侧展示面板 */
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        /* ================= 过滤器与筛选区 ================= */
+        .panel-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 0 20px -5px rgba(99, 102, 241, 0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-header-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .panel-header-title svg {
+            color: #818cf8;
+        }
+        .btn-text {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s;
+        }
+        .btn-text:hover { color: #ffffff; }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        .filter-grid-span-2 {
+            grid-column: span 2;
+        }
+        @media (max-width: 768px) {
+            .filter-grid-span-2 {
+                grid-column: span 1;
+            }
+        }
+        .form-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .input-icon {
+            position: absolute;
+            left: 12px;
+            color: var(--text-dark);
+            pointer-events: none;
+        }
+        .input-control {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 13px;
+            color: var(--text-main);
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-control:focus {
+            border-color: var(--primary);
+        }
+        .pl-9 { padding-left: 36px; }
+        .input-control-mono { font-family: var(--font-mono); }
+
+        .form-row-actions {
+            display: flex;
+            justify-content: flex-end;
+            padding-top: 12px;
+            border-top: 1px solid rgba(30, 41, 59, 0.6);
+        }
+        .btn-action {
+            background: var(--primary);
+            color: #ffffff;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+        .btn-action:hover {
+            background: var(--primary-hover);
+        }
+
+        /* ================= 结果与卡片 ================= */
+        .results-section {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .results-title {
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .results-title svg { color: #818cf8; }
+        .badge-count {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            background: rgba(30, 41, 59, 0.8);
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+        .btn-outline {
+            background: rgba(15, 23, 42, 0.3);
+            border: 1px solid var(--border-color);
+            color: #cbd5e1;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+        .btn-outline:hover {
+            background: rgba(30, 41, 59, 0.5);
+            border-color: var(--border-hover);
+        }
+
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* 空状态与占位区 */
+        .empty-placeholder {
+            text-align: center;
+            padding: 48px 24px;
+            background: rgba(15, 23, 42, 0.1);
+            border: 1px dashed var(--border-color);
+            border-radius: 16px;
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .placeholder-icon {
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+        .empty-placeholder p.lead {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .empty-placeholder p.sub {
+            font-size: 12px;
+            color: var(--text-dark);
+        }
+
+        /* 渲染卡片 */
+        .card {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.2s;
+        }
+        .card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+        }
+        .card-meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            border-bottom: 1px solid rgba(30, 41, 59, 0.5);
+            padding-bottom: 10px;
+        }
+        .card-badges {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .type-badge {
+            font-size: 10px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .type-ocr {
+            background: rgba(14, 165, 233, 0.1);
+            border-color: rgba(14, 165, 233, 0.15);
+            color: #38bdf8;
+        }
+        .type-audio {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+        }
+        .card-app-name {
+            font-size: 13px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--text-main);
+        }
+        .card-window-badge {
+            font-size: 10px;
+            background: #020617;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-family: var(--font-mono);
+        }
+        .card-timestamp {
+            font-size: 10px;
+            color: var(--text-dark);
+            font-family: var(--font-mono);
+        }
+        .card-content {
+            font-size: 13px;
+            color: #cbd5e1;
+            line-height: 1.6;
+            background: rgba(2, 6, 23, 0.6);
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(30, 41, 59, 0.8);
+            font-family: var(--font-mono);
+            max-height: 160px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-dark);
+        }
+        .card-id {
+            font-family: var(--font-mono);
+        }
+        .btn-card-copy {
+            background: transparent;
+            border: none;
+            color: var(--text-dark);
+            font-family: var(--font-mono);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s;
+        }
+        .btn-card-copy:hover { color: #ffffff; }
+
+        /* ================= REST API 发送器 ================= */
+        .api-input-row {
+            display: flex;
+            flex-direction: row;
+            gap: 12px;
+        }
+        @media (max-width: 768px) {
+            .api-input-row {
+                flex-direction: column;
+            }
+        }
+        .select-control {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px;
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            font-weight: 600;
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+        }
+        .select-control:focus { border-color: var(--primary); }
+        .endpoint-wrapper {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .endpoint-prefix {
+            position: absolute;
+            left: 12px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--text-dark);
+            user-select: none;
+        }
+        .endpoint-input {
+            padding-left: 130px;
+        }
+
+        .api-body-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .textarea-control {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 13px;
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            min-height: 96px;
+            resize: vertical;
+            outline: none;
+            width: 100%;
+        }
+        .textarea-control:focus { border-color: var(--primary); }
+
+        /* 响应展示框 */
+        .response-box-wrapper {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+        }
+        .response-header {
+            background: rgba(15, 23, 42, 0.6);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-b: 1px solid var(--border-color);
+        }
+        .response-title-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .response-title-info span.title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .status-pill {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+        .status-pill-success {
+            background: rgba(6, 78, 59, 0.4);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+        .status-pill-error {
+            background: rgba(76, 5, 25, 0.4);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+        .code-container {
+            flex: 1;
+            overflow: auto;
+            background: #020617;
+            padding: 20px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: #a5b4fc;
+            line-height: 1.6;
+        }
+        .code-pre {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* ================= 避坑指南面板 ================= */
+        .warning-card {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-border);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .warning-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #fbbf24;
+        }
+        .warning-header h2 {
+            font-size: 16px;
+            font-weight: 700;
+        }
+        .warning-header p {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        .warning-body {
+            font-size: 14px;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+        .code-inline {
+            background: rgba(2, 6, 23, 0.5);
+            color: #fca5a5;
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+        .guide-bullets {
+            list-style: disc;
+            padding-left: 20px;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
+        .guide-solutions {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .guide-solutions h3 {
+            font-size: 14px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .guide-solutions h3 svg { color: #818cf8; }
+        .solutions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+        }
+        .solution-item {
+            background: #020617;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .solution-tag {
+            font-size: 11px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: #818cf8;
+            text-transform: uppercase;
+        }
+        .solution-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        kbd {
+            background: #1e293b;
+            color: #ffffff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: var(--font-sans);
+            font-size: 11px;
+            border: 1px solid #334155;
+        }
+
+        /* ================= 辅助类 ================= */
+        .hidden { display: none !important; }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* 全局轻量提示组件 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid transparent;
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
+            transition: all 0.3s transform ease;
+            opacity: 0;
+            transform: translateX(20px);
+        }
+        .toast-show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .toast-success {
+            background: #064e3b;
+            border-color: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+        .toast-error {
+            background: #4c0519;
+            border-color: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+        .toast-info {
+            background: #1e293b;
+            border-color: #334155;
+            color: #a5b4fc;
+        }
+
+        footer.site-footer {
+            border-top: 1px solid var(--border-color);
+            background: #010409;
+            padding: 16px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-dark);
+            margin-top: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 全局轻量提示组件 -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- 顶部导航栏 -->
+    <header class="site-header">
+        <div class="header-content">
+            <!-- 标志与标题 -->
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg class="svg-icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="4 17 10 11 4 5"></polyline>
+                        <line x1="12" y1="19" x2="20" y2="19"></line>
+                    </svg>
+                </div>
+                <div class="brand-title">
+                    <h1>Screenpipe Debugger</h1>
+                    <p>全能数据检索与 API 调试控制台</p>
+                </div>
+            </div>
+
+            <!-- 本地连接管理器 (手动输入 & 状态指示) -->
+            <div class="conn-manager">
+                <div class="input-group-host">
+                    <span class="host-label">HOST:</span>
+                    <input type="text" id="host-input" class="host-input" placeholder="http://localhost:3030">
+                    <button onclick="testConnection()" class="btn btn-primary" style="border-radius: 8px; padding: 4px 10px;">
+                        <svg id="btn-sync-icon" class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                        </svg>
+                        <span>测试</span>
+                    </button>
+                </div>
+
+                <!-- 状态指示灯 -->
+                <div id="status-badge" class="status-badge status-disconnected">
+                    <span class="dot dot-disconnected" id="status-dot"></span>
+                    <span id="status-text">未连接</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-layout">
+        
+        <!-- 左侧菜单与配置面板 -->
+        <aside class="sidebar">
+            <!-- 导航标签 -->
+            <nav class="tab-navigation">
+                <button onclick="switchTab('search')" id="tab-search" class="nav-btn active">
+                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <span>智能数据检索</span>
+                </button>
+                <button onclick="switchTab('raw')" id="tab-raw" class="nav-btn">
+                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                        <rect x="9" y="9" width="6" height="6"></rect>
+                        <line x1="9" y1="1" x2="9" y2="4"></line>
+                        <line x1="15" y1="1" x2="15" y2="4"></line>
+                        <line x1="9" y1="20" x2="9" y2="23"></line>
+                        <line x1="15" y1="20" x2="15" y2="23"></line>
+                        <line x1="20" y1="9" x2="23" y2="9"></line>
+                        <line x1="20" y1="15" x2="23" y2="15"></line>
+                        <line x1="1" y1="9" x2="4" y2="9"></line>
+                        <line x1="1" y1="15" x2="4" y2="15"></line>
+                    </svg>
+                    <span>原始 API 调试</span>
+                </button>
+                <button onclick="switchTab('guide')" id="tab-guide" class="nav-btn text-amber">
+                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>托管部署避坑</span>
+                </button>
+            </nav>
+
+            <!-- 统计微卡 -->
+            <div class="widget-panel">
+                <div class="widget-title">快捷工具</div>
+                <div class="widget-grid">
+                    <button onclick="quickAction('/health')" class="widget-btn">
+                        <span>/health</span>
+                        <svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                    <button onclick="quickAction('/search?limit=1')" class="widget-btn">
+                        <span>最新的 1 条记录</span>
+                        <svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 右侧主展示区 -->
+        <main class="content-area">
+
+            <!-- TAB 1: 智能检索面板 -->
+            <section id="panel-search" class="tab-panel">
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <div class="panel-header-title">
+                            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="4" y1="21" x2="4" y2="14"></line>
+                                <line x1="4" y1="10" x2="4" y2="3"></line>
+                                <line x1="12" y1="21" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12" y2="3"></line>
+                                <line x1="20" y1="21" x2="20" y2="16"></line>
+                                <line x1="20" y1="12" x2="20" y2="3"></line>
+                                <line x1="2" y1="14" x2="6" y2="14"></line>
+                                <line x1="10" y1="8" x2="14" y2="8"></line>
+                                <line x1="18" y1="16" x2="22" y2="16"></line>
+                            </svg>
+                            <h2>多维度检索过滤器</h2>
+                        </div>
+                        <button onclick="resetFilters()" class="btn-text">
+                            <svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                            重置筛选
+                        </button>
+                    </div>
+
+                    <div class="filter-grid">
+                        <!-- 搜索框 -->
+                        <div class="form-item filter-grid-span-2">
+                            <label class="form-label">搜索关键词 (Q)</label>
+                            <div class="input-wrapper">
+                                <span class="input-icon">
+                                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                    </svg>
+                                </span>
+                                <input type="text" id="filter-q" class="input-control pl-9 input-control-mono" placeholder="输入你想找回的历史碎片，例如：Clang 20">
+                            </div>
+                        </div>
+
+                        <!-- 数据源类型 -->
+                        <div class="form-item">
+                            <label class="form-label">数据源类型 (content_type)</label>
+                            <select id="filter-type" class="input-control select-control" style="padding: 8px 12px; font-weight: normal;">
+                                <option value="all">全部 (All)</option>
+                                <option value="ocr">视觉文字 (OCR)</option>
+                                <option value="audio">音频记录 (Audio)</option>
+                            </select>
+                        </div>
+
+                        <!-- 限制数量 -->
+                        <div class="form-item">
+                            <label class="form-label">条数限制 (limit)</label>
+                            <input type="number" id="filter-limit" value="10" class="input-control input-control-mono">
+                        </div>
+
+                        <!-- APP名称 -->
+                        <div class="form-item">
+                            <label class="form-label">App 进程过滤 (app_name)</label>
+                            <input type="text" id="filter-app" class="input-control input-control-mono" placeholder="例如：chrome, arc">
+                        </div>
+
+                        <!-- 窗口名称 -->
+                        <div class="form-item">
+                            <label class="form-label">窗口标题过滤 (window_name)</label>
+                            <input type="text" id="filter-window" class="input-control input-control-mono" placeholder="例如：GitHub, 终端">
+                        </div>
+                    </div>
+
+                    <div class="form-row-actions">
+                        <button onclick="executeSearch()" class="btn btn-action">
+                            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                            <span>开始穿梭检索</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 检索结果区 -->
+                <div class="results-section" style="margin-top: 24px;">
+                    <div class="results-header">
+                        <div class="results-title">
+                            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                                <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path>
+                            </svg>
+                            <span>检索结果</span>
+                            <span id="results-count" class="badge-count">0 条</span>
+                        </div>
+                        <button onclick="copyCurrentResults()" class="btn btn-outline flex">
+                            <svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span>拷贝 JSON 结果</span>
+                        </button>
+                    </div>
+
+                    <!-- 动态注入的结果卡片列表 -->
+                    <div id="results-list" class="results-list">
+                        <div class="empty-placeholder">
+                            <svg class="svg-icon icon-lg placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            </svg>
+                            <p class="lead">尚未执行检索，或本地连接未打通</p>
+                            <p class="sub">请先点击右上角的 “测试” 确认 Screenpipe 服务已启动</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: 原始 API 调试器 -->
+            <section id="panel-raw" class="tab-panel hidden">
+                <div class="panel-card">
+                    <div class="panel-header-title">
+                        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"></path>
+                            <path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"></path>
+                        </svg>
+                        <h2>原始 REST API 发送器</h2>
+                    </div>
+
+                    <div class="api-input-row">
+                        <!-- 方法选择 -->
+                        <select id="raw-method" class="select-control">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                        </select>
+                        <!-- 路由地址 -->
+                        <div class="endpoint-wrapper">
+                            <span id="raw-base-url" class="endpoint-prefix">http://localhost:3030</span>
+                            <input type="text" id="raw-endpoint" value="/search?limit=3" class="input-control endpoint-input input-control-mono">
+                        </div>
+                        <!-- 发送按钮 -->
+                        <button onclick="sendRawRequest()" class="btn btn-primary" style="padding: 10px 24px; border-radius: 10px;">
+                            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            <span>发送请求</span>
+                        </button>
+                    </div>
+
+                    <!-- POST Body 编辑器 (默认隐藏) -->
+                    <div id="raw-body-container" class="api-body-wrapper hidden">
+                        <label class="form-label">请求主体 JSON (Body)</label>
+                        <textarea id="raw-body" class="textarea-control" placeholder="{}"></textarea>
+                    </div>
+                </div>
+
+                <!-- 响应展示区 -->
+                <div class="response-box-wrapper" style="margin-top: 24px;">
+                    <div class="response-header">
+                        <div class="response-title-info">
+                            <span class="title">HTTP 响应体</span>
+                            <span id="raw-status" class="status-pill status-pill-success hidden">STATUS: 200</span>
+                        </div>
+                        <button onclick="copyRawResponse()" class="btn-text">
+                            <svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span>复制 JSON</span>
+                        </button>
+                    </div>
+                    <!-- 代码展示框 -->
+                    <div class="code-container">
+                        <pre id="raw-response-box" class="code-pre">此处将显示原始 JSON 格式的 API 响应输出...</pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: 避坑指南面板 -->
+            <section id="panel-guide" class="tab-panel hidden">
+                <!-- CORS 警告卡片 -->
+                <div class="warning-card">
+                    <div class="warning-header">
+                        <svg class="svg-icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <div>
+                            <h2>为什么我在 GitHub Pages 部署后无法连通本地？</h2>
+                            <p>这是由于浏览器极其严格的安全屏障带来的常见问题</p>
+                        </div>
+                    </div>
+                    
+                    <div class="warning-body">
+                        <p>当你把此控制台托管在 GitHub Pages 上（通过 <code class="code-inline">https://&lt;name&gt;.github.io</code> 访问）时，由于控制台处于 <strong>HTTPS 安全协议</strong> 中，而您的 Screenpipe 本地服务通常是在 <strong>HTTP（localhost:3030）</strong> 运行：</p>
+                        <ul class="guide-bullets">
+                            <li><strong>混合内容阻挡 (Mixed Content)</strong>：现代浏览器为了防止窃听，默认会直接封死 HTTPS 页面向 HTTP 发送的异步 AJAX 请求 (Fetch/XHR)。</li>
+                            <li><strong>跨域拦截 (CORS)</strong>：如果 Screenpipe 的底层 API 没有配置显式的跨域允许白名单，请求会卡在 Preflight 握手期。</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 通关秘籍卡片 -->
+                <div class="guide-solutions" style="margin-top: 24px;">
+                    <h3>
+                        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                        </svg>
+                        <span>推荐的 4 个通关姿势</span>
+                    </h3>
+
+                    <div class="solutions-grid">
+                        <div class="solution-item">
+                            <div class="solution-tag">方案一 / 最方便：本地保存运行（极力推荐）</div>
+                            <p class="solution-text">
+                                不需要服务器，不需要任何部署。直接在浏览器上按下 <kbd>Ctrl + S</kbd>（或右键另存为），将当前网页保存为本地的 <code class="code-inline">index.html</code> 文件。双击在浏览器里打开它，由于没有域限制，它能无障碍跨越沙箱访问本地 API。
+                            </p>
+                        </div>
+
+                        <div class="solution-item">
+                            <div class="solution-tag">方案二 / 修改浏览器混合安全设置</div>
+                            <p class="solution-text">
+                                如果坚持在 GitHub 线上直接运行，可以点击浏览器地址栏最左侧的 <strong>网站设置（一把小锁图标）</strong>，找到 <strong>“不安全的内容”(Insecure content)</strong>，并将其修改为 <strong>“允许”</strong>，刷新网页即可。
+                            </p>
+                        </div>
+
+                        <div class="solution-item">
+                            <div class="solution-tag">方案三 / 使用 ngrok 等反向代理</div>
+                            <p class="solution-text">
+                                将本地服务映射为安全的 HTTPS 地址（如运行 <code class="code-inline">ngrok http 3030</code> 映射出公网 SSL），然后将生成的公网 HTTPS 链接手动填入本站顶部的 HOST 配置框。
+                            </p>
+                        </div>
+
+                        <div class="solution-item">
+                            <div class="solution-tag">方案四 / 本地启动简易 HTTP 服务</div>
+                            <p class="solution-text">
+                                在本地有 index.html 的路径上运行 <code class="code-inline">npx serve</code>，启动一个轻量级的 HTTP 本地服务器访问它，从而完美绕开 HTTPS 的严格域名安全限制。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <footer class="site-footer">
+        <p>© 2026 Screenpipe 极客社区专供 | 基于 Rust + WASM + Electron 混合计算生态</p>
+    </footer>
+
+    <!-- JavaScript 驱动逻辑 -->
+    <script>
+        // 1. 初始化常量与持久化宿主
+        const DEFAULT_HOST = "http://localhost:3030";
+        let hostUrl = localStorage.getItem("screenpipe_host") || DEFAULT_HOST;
+        let isConnected = false;
+        let activeTab = "search";
+        let lastQueryData = null; // 缓存当前的搜索结果 JSON，用于拷贝
+
+        // 绑定输入框的持久化逻辑
+        const hostInput = document.getElementById("host-input");
+        const rawBaseUrlSpan = document.getElementById("raw-base-url");
+        
+        hostInput.value = hostUrl;
+        rawBaseUrlSpan.textContent = hostUrl;
+
+        hostInput.addEventListener("input", (e) => {
+            let val = e.target.value.trim();
+            if (!val) val = DEFAULT_HOST;
+            // 去掉尾部的斜杠以防止拼接出双斜杠
+            if (val.endsWith("/")) val = val.slice(0, -1);
+            hostUrl = val;
+            localStorage.setItem("screenpipe_host", hostUrl);
+            rawBaseUrlSpan.textContent = hostUrl;
+        });
+
+        // 2. 初始化自动探测
+        document.addEventListener("DOMContentLoaded", () => {
+            testConnection(true);
+        });
+
+        // 3. 通用 Toast 弹窗反馈机制
+        function showToast(message, type = "info") {
+            const container = document.getElementById("toast-container");
+            const toast = document.createElement("div");
+            
+            const toastClass = type === "success" ? "toast-success" :
+                               type === "error" ? "toast-error" :
+                               "toast-info";
+            
+            toast.className = `toast-item ${toastClass}`;
+            toast.innerHTML = `<span style="flex:1;">${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            // 动画切入
+            setTimeout(() => {
+                toast.classList.add("toast-show");
+            }, 50);
+
+            // 延时消除
+            setTimeout(() => {
+                toast.classList.remove("toast-show");
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // 4. 路由与 Tab 切换
+        function switchTab(tabName) {
+            activeTab = tabName;
+            
+            // 样式重置
+            document.querySelectorAll(".nav-btn").forEach(btn => {
+                btn.classList.remove("active");
+            });
+            document.querySelectorAll(".tab-panel").forEach(panel => {
+                panel.classList.add("hidden");
+            });
+
+            // 激活特定 Tab
+            const activeBtn = document.getElementById(`tab-${tabName}`);
+            activeBtn.classList.add("active");
+            
+            document.getElementById(`panel-${tabName}`).classList.remove("hidden");
+        }
+
+        // 5. 连接探测 (带测试动画和超时保护)
+        async function testConnection(isSilent = false) {
+            const syncIcon = document.getElementById("btn-sync-icon");
+            syncIcon.classList.add("animate-spin");
+
+            const statusBadge = document.getElementById("status-badge");
+            const statusDot = document.getElementById("status-dot");
+            const statusText = document.getElementById("status-text");
+
+            // 超时时限控制器
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+            try {
+                const response = await fetch(`${hostUrl}/health`, { 
+                    method: 'GET',
+                    signal: controller.signal 
+                });
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    isConnected = true;
+                    statusBadge.className = "status-badge status-connected";
+                    statusDot.className = "dot dot-connected";
+                    statusText.textContent = "连通正常";
+                    if (!isSilent) showToast("🎉 连接测试成功！Screenpipe 响应就绪", "success");
+                } else {
+                    throw new Error();
+                }
+            } catch (err) {
+                clearTimeout(timeoutId);
+                isConnected = false;
+                statusBadge.className = "status-badge status-disconnected";
+                statusDot.className = "dot dot-disconnected";
+                statusText.textContent = "连通失败";
+                if (!isSilent) showToast("❌ 无法访问本地 Screenpipe。请检查控制台或 CORS 设置", "error");
+            } finally {
+                syncIcon.classList.remove("animate-spin");
+            }
+        }
+
+        // 6. 快捷操作面板注入
+        function quickAction(endpoint) {
+            switchTab("raw");
+            document.getElementById("raw-method").value = "GET";
+            document.getElementById("raw-endpoint").value = endpoint;
+            sendRawRequest();
+        }
+
+        // 7. 多维高级检索实现
+        async function executeSearch() {
+            const q = document.getElementById("filter-q").value.trim();
+            const type = document.getElementById("filter-type").value;
+            const limit = document.getElementById("filter-limit").value || 10;
+            const app = document.getElementById("filter-app").value.trim();
+            const win = document.getElementById("filter-window").value.trim();
+
+            const listContainer = document.getElementById("results-list");
+            listContainer.innerHTML = `
+                <div class="empty-placeholder">
+                    <svg class="svg-icon icon-lg animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="2" x2="12" y2="6"></line>
+                        <line x1="12" y1="18" x2="12" y2="22"></line>
+                        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                        <line x1="2" y1="12" x2="6" y2="12"></line>
+                        <line x1="18" y1="12" x2="22" y2="12"></line>
+                        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                    </svg>
+                    <p class="lead">正在搜索 Screenpipe 记忆库...</p>
+                </div>
+            `;
+
+            // 拼接请求 URL
+            let params = new URLSearchParams();
+            if (q) params.append("q", q);
+            if (type !== "all") params.append("content_type", type);
+            params.append("limit", limit);
+            if (app) params.append("app_name", app);
+            if (win) params.append("window_name", win);
+
+            const targetUrl = `${hostUrl}/search?${params.toString()}`;
+
+            try {
+                const res = await fetch(targetUrl);
+                if (!res.ok) throw new Error(`HTTP Status ${res.status}`);
+                
+                const data = await res.json();
+                lastQueryData = data; // 缓存起来以便一键拷贝
+                
+                renderResults(data);
+            } catch (err) {
+                listContainer.innerHTML = `
+                    <div class="warning-card" style="background: rgba(127, 29, 29, 0.2); border-color: rgba(239, 68, 68, 0.2); padding: 20px;">
+                        <div class="warning-header" style="color: #f87171;">
+                            <svg class="svg-icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            <span style="font-weight: bold;">检索请求失败</span>
+                        </div>
+                        <p style="font-size:12px; margin-top:8px;">
+                            接口地址: <code class="code-inline" style="color: #fca5a5;">${targetUrl}</code>
+                        </p>
+                        <p style="font-size:12px; color:#cbd5e1; margin-top:6px; line-height: 1.5;">
+                            可能原因：宿主机 Screenpipe 服务未启动、端口冲突，或者在 GitHub Pages 托管上运行时遇到了 <strong>“混合内容限制(Mixed Content Block)”</strong>。建议跳转至左侧的“托管部署避坑”查看解决办法。
+                        </p>
+                    </div>
+                `;
+                showToast("搜索请求执行失败", "error");
+            }
+        }
+
+        // 渲染搜索结果卡片 (内嵌纯 SVG 图标)
+        function renderResults(data) {
+            const listContainer = document.getElementById("results-list");
+            const countBadge = document.getElementById("results-count");
+            
+            const items = data.data || [];
+            countBadge.textContent = `${items.length} 条`;
+
+            if (items.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="empty-placeholder">
+                        <svg class="svg-icon icon-lg placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                        <p class="lead">没有匹配到任何符合条件的记忆碎片</p>
+                        <p class="sub">换个搜索条件重新试试吧</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listContainer.innerHTML = ""; // 清空
+
+            items.forEach((item, index) => {
+                const type = item.type; // "OCR" 或 "Audio"
+                const timestamp = new Date(item.timestamp).toLocaleString();
+                
+                // 智能提炼文本
+                let title = "未知进程数据";
+                let badgeClass = "type-ocr";
+                let iconSvg = `
+                    <svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                        <rect x="9" y="9" width="6" height="6"></rect>
+                        <line x1="9" y1="1" x2="9" y2="4"></line>
+                        <line x1="15" y1="1" x2="15" y2="4"></line>
+                        <line x1="9" y1="20" x2="9" y2="23"></line>
+                        <line x1="15" y1="20" x2="15" y2="23"></line>
+                    </svg>
+                `;
+                let mainText = "";
+
+                if (type === "OCR" || item.content?.text) {
+                    const ocrData = item.content;
+                    title = ocrData.app_name || "桌面画面";
+                    badgeClass = "type-ocr";
+                    iconSvg = `
+                        <svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                    `;
+                    mainText = ocrData.text || "(无文本提取)";
+                } else if (type === "Audio" || item.content?.transcription) {
+                    const audioData = item.content;
+                    title = audioData.device || "音频输入通道";
+                    badgeClass = "type-audio";
+                    iconSvg = `
+                        <svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" y1="19" x2="12" y2="23"></line>
+                        </svg>
+                    `;
+                    mainText = audioData.transcription || "(音频尚未转录成功)";
+                }
+
+                const windowLabel = item.content?.window_name ? `
+                    <span class="card-window-badge">
+                        <svg class="svg-icon" style="width:12px; height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="2" y1="8" x2="22" y2="8"></line>
+                        </svg>
+                        ${item.content.window_name}
+                    </span>
+                ` : '';
+
+                const card = document.createElement("div");
+                card.className = "card";
+                card.innerHTML = `
+                    <!-- 头部标签 -->
+                    <div class="card-meta-row">
+                        <div class="card-badges">
+                            <span class="type-badge ${badgeClass}">
+                                ${iconSvg}
+                                ${type}
+                            </span>
+                            <span class="card-app-name">${title}</span>
+                            ${windowLabel}
+                        </div>
+                        <span class="card-timestamp">${timestamp}</span>
+                    </div>
+
+                    <!-- 主要内容区 -->
+                    <div class="card-content">${escapeHtml(mainText)}</div>
+
+                    <!-- 元数据小抽屉 -->
+                    <div class="card-footer">
+                        <span class="card-id">ID: ${item.id || index}</span>
+                        <button onclick="copySingleItem(${index})" class="btn-card-copy">
+                            <svg class="svg-icon" style="width:12px; height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            复制完整对象
+                        </button>
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+
+        // 8. 原始 API 请求调试实现
+        async function sendRawRequest() {
+            const method = document.getElementById("raw-method").value;
+            const endpoint = document.getElementById("raw-endpoint").value.trim();
+            const bodyContent = document.getElementById("raw-body").value.trim();
+            const responseBox = document.getElementById("raw-response-box");
+            const statusBadge = document.getElementById("raw-status");
+
+            responseBox.textContent = "请求发送中...";
+            statusBadge.classList.add("hidden");
+
+            const requestUrl = `${hostUrl}${endpoint}`;
+
+            try {
+                let options = { method };
+                if (method === "POST" && bodyContent) {
+                    options.body = bodyContent;
+                    options.headers = { "Content-Type": "application/json" };
+                }
+
+                const res = await fetch(requestUrl, options);
+                statusBadge.textContent = `STATUS: ${res.status} ${res.statusText}`;
+                
+                if (res.ok) {
+                    statusBadge.className = "status-pill status-pill-success";
+                } else {
+                    statusBadge.className = "status-pill status-pill-error";
+                }
+                statusBadge.classList.remove("hidden");
+
+                const contentType = res.headers.get("content-type");
+                let dataText = "";
+                if (contentType && contentType.includes("application/json")) {
+                    const dataJson = await res.json();
+                    dataText = JSON.stringify(dataJson, null, 2);
+                } else {
+                    dataText = await res.text();
+                }
+
+                responseBox.textContent = dataText;
+                showToast("请求发送完成", "success");
+            } catch (err) {
+                statusBadge.textContent = "STATUS: ERROR";
+                statusBadge.className = "status-pill status-pill-error";
+                statusBadge.classList.remove("hidden");
+                responseBox.textContent = `发送请求至 [ ${requestUrl} ] 时遭遇致命网络障碍。\n可能引发的原因为跨域限制 (CORS)、混合安全内容拦截，或是端口根本未开启。`;
+                showToast("发送请求遭遇失败", "error");
+            }
+        }
+
+        // 监听 HTTP 方法变换
+        document.getElementById("raw-method").addEventListener("change", (e) => {
+            const container = document.getElementById("raw-body-container");
+            if (e.target.value === "POST") {
+                container.classList.remove("hidden");
+            } else {
+                container.classList.add("hidden");
+            }
+        });
+
+        // 9. 辅助工具：重置筛选条件
+        function resetFilters() {
+            document.getElementById("filter-q").value = "";
+            document.getElementById("filter-type").value = "all";
+            document.getElementById("filter-limit").value = "10";
+            document.getElementById("filter-app").value = "";
+            document.getElementById("filter-window").value = "";
+            showToast("搜索过滤器已重置");
+        }
+
+        // 10. 辅助工具：复制当前所有检索结果 JSON
+        function copyCurrentResults() {
+            if (!lastQueryData) {
+                showToast("当前并无有效结果可进行拷贝", "error");
+                return;
+            }
+            copyToClipboard(JSON.stringify(lastQueryData, null, 2));
+        }
+
+        // 11. 辅助工具：复制单个结果项 JSON
+        function copySingleItem(index) {
+            if (!lastQueryData || !lastQueryData.data || !lastQueryData.data[index]) {
+                showToast("对象获取错误", "error");
+                return;
+            }
+            copyToClipboard(JSON.stringify(lastQueryData.data[index], null, 2));
+        }
+
+        // 12. 辅助工具：复制原始 API 响应
+        function copyRawResponse() {
+            const codeBoxText = document.getElementById("raw-response-box").textContent;
+            copyToClipboard(codeBoxText);
+        }
+
+        // 13. 系统垫片：剪贴板强健复制
+        function copyToClipboard(text) {
+            try {
+                // 因 iframe 限制，直接利用旧版的 textarea 选择器来完成降级复制
+                const textarea = document.createElement("textarea");
+                textarea.value = text;
+                textarea.style.position = "fixed"; 
+                textarea.style.opacity = "0";
+                document.body.appendChild(textarea);
+                textarea.select();
+                const success = document.execCommand("copy");
+                document.body.removeChild(textarea);
+                
+                if (success) {
+                    showToast("📋 成功复制至剪贴板！", "success");
+                } else {
+                    throw new Error("Copy command unsuccessful");
+                }
+            } catch (err) {
+                showToast("拷贝发生异常，请手动选中复制", "error");
+            }
+        }
+
+        // HTML 转义防止 XSS 注入
+        function escapeHtml(text) {
+            if (!text) return "";
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
